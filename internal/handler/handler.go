@@ -1,22 +1,23 @@
-package url
+package handler
 
 import (
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/kbannyi/shortener/internal/service/url"
 )
 
-type URLHandler struct {
-	service url.URLService
+type Service interface {
+	Create(value string) (ID string)
+	Get(ID string) (string, bool)
 }
 
-func NewHandler() *URLHandler {
-	return &URLHandler{
-		service: *url.NewService(),
-	}
+type URLHandler struct {
+	Service Service
+}
+
+func NewHandler(s Service) *URLHandler {
+	return &URLHandler{s}
 }
 
 func (h *URLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +46,7 @@ func (h *URLHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Shortening link %v\n", link)
 	w.WriteHeader(http.StatusCreated)
-	linkid := h.service.Create(link)
+	linkid := h.Service.Create(link)
 	_, err = io.WriteString(w, fmt.Sprintf("http://localhost:8080/%v", linkid))
 	if err != nil {
 		panic(err)
@@ -61,7 +62,7 @@ func (h *URLHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, ok := h.service.Get(linkid)
+	link, ok := h.Service.Get(linkid)
 	if !ok {
 		http.Error(w, "Unknown link", http.StatusBadRequest)
 		return
