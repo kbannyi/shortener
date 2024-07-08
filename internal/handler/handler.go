@@ -23,16 +23,16 @@ func NewHandler(s Service) *URLHandler {
 func (h *URLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		h.handleGet(w, r)
+		h.HandleGet(w, r)
 	case http.MethodPost:
-		h.handlePost(w, r)
+		h.HandlePost(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 }
 
-func (h *URLHandler) handlePost(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	linkBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't read body", http.StatusBadRequest)
@@ -53,9 +53,9 @@ func (h *URLHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *URLHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	linkid := strings.TrimPrefix(r.URL.String(), "/")
-	fmt.Printf("Getting link %v\n", linkid)
+	fmt.Printf("Getting link %q\n", linkid)
 
 	if len(linkid) == 0 {
 		http.Error(w, "Link id can't be empty", http.StatusBadRequest)
