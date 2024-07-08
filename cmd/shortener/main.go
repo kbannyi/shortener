@@ -4,26 +4,16 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi"
-	"github.com/kbannyi/shortener/internal/handler"
 	"github.com/kbannyi/shortener/internal/repository"
+	"github.com/kbannyi/shortener/internal/router"
 	"github.com/kbannyi/shortener/internal/service"
 )
 
 func main() {
 	fmt.Println("Starting server...")
-	err := http.ListenAndServe(":8080", URLRouter())
+	err := http.ListenAndServe(":8080",
+		router.NewURLRouter(service.NewService(repository.NewRepository())))
 	if err != nil {
 		panic(err)
 	}
-}
-
-func URLRouter() chi.Router {
-	r := chi.NewRouter()
-	h := handler.NewHandler(service.NewService(repository.NewRepository()))
-
-	r.Get("/{id}", h.HandleGet)
-	r.Post("/", h.HandlePost)
-
-	return r
 }

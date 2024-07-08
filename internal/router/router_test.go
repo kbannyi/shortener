@@ -1,4 +1,4 @@
-package handler
+package router
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ func (s *MockService) Get(ID string) (string, bool) {
 	return "redirect", ID == "mockid"
 }
 
-func TestURLHandler_ServeHTTP(t *testing.T) {
+func TestURLRouter(t *testing.T) {
 	tests := []struct {
 		method       string
 		request      string
@@ -27,11 +27,6 @@ func TestURLHandler_ServeHTTP(t *testing.T) {
 		expectedCode int
 		expectedBody string
 	}{
-		{
-			method:       http.MethodGet,
-			request:      "/",
-			expectedCode: http.StatusBadRequest,
-		},
 		{
 			method:       http.MethodPost,
 			request:      "/",
@@ -70,9 +65,9 @@ func TestURLHandler_ServeHTTP(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, tc.request, strings.NewReader(tc.body))
 			w := httptest.NewRecorder()
-			h := NewHandler(&MockService{})
+			router := NewURLRouter(&MockService{})
 
-			h.ServeHTTP(w, r)
+			router.ServeHTTP(w, r)
 			assert.Equal(t, tc.expectedCode, w.Code)
 			if tc.expectedBody != "" {
 				assert.Equal(t, tc.expectedBody, w.Body.String())

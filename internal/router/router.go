@@ -1,38 +1,33 @@
-package handler
+package router
 
 import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+
+	"github.com/go-chi/chi"
 )
+
+type URLRouter struct {
+	chi.Router
+	Service Service
+}
 
 type Service interface {
 	Create(value string) (ID string)
 	Get(ID string) (string, bool)
 }
 
-type URLHandler struct {
-	Service Service
+func NewURLRouter(s Service) *URLRouter {
+	r := URLRouter{chi.NewRouter(), s}
+
+	r.Get("/{id}", r.handleGet)
+	r.Post("/", r.handlePost)
+
+	return &r
 }
 
-func NewHandler(s Service) *URLHandler {
-	return &URLHandler{s}
-}
-
-func (h *URLHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		h.HandleGet(w, r)
-	case http.MethodPost:
-		h.HandlePost(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-}
-
-func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
+func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 	linkBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't read body", http.StatusBadRequest)
@@ -44,17 +39,17 @@ func (h *URLHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Shortening link %v\n", link)
+	fmt.Printf("Shortening link %q\n", link)
 	w.WriteHeader(http.StatusCreated)
-	linkid := h.Service.Create(link)
+	linkid := router.Service.Create(link)
 	_, err = io.WriteString(w, fmt.Sprintf("http://localhost:8080/%v", linkid))
 	if err != nil {
 		panic(err)
 	}
 }
 
-func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
-	linkid := strings.TrimPrefix(r.URL.String(), "/")
+func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
+	linkid := chi.URLParam(r, "id")
 	fmt.Printf("Getting link %q\n", linkid)
 
 	if len(linkid) == 0 {
@@ -62,7 +57,7 @@ func (h *URLHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, ok := h.Service.Get(linkid)
+	link, ok := router.Service.Get(linkid)
 	if !ok {
 		http.Error(w, "Unknown link", http.StatusBadRequest)
 		return
