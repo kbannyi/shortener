@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kbannyi/shortener/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,7 +66,9 @@ func TestURLRouter(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, tc.request, strings.NewReader(tc.body))
 			w := httptest.NewRecorder()
-			router := NewURLRouter(&MockService{})
+			router := NewURLRouter(&MockService{}, config.Flags{
+				RedirectBaseAddr: "http://localhost:8080/",
+			})
 
 			router.ServeHTTP(w, r)
 			assert.Equal(t, tc.expectedCode, w.Code)

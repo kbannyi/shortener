@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi"
+	"github.com/kbannyi/shortener/internal/config"
 )
 
 type URLRouter struct {
 	chi.Router
 	Service Service
+	Flags   config.Flags
 }
 
 type Service interface {
@@ -18,8 +21,8 @@ type Service interface {
 	Get(ID string) (string, bool)
 }
 
-func NewURLRouter(s Service) *URLRouter {
-	r := URLRouter{chi.NewRouter(), s}
+func NewURLRouter(s Service, c config.Flags) *URLRouter {
+	r := URLRouter{chi.NewRouter(), s, c}
 
 	r.Get("/{id}", r.handleGet)
 	r.Post("/", r.handlePost)
@@ -42,7 +45,11 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Shortening link %q\n", link)
 	w.WriteHeader(http.StatusCreated)
 	linkid := router.Service.Create(link)
-	_, err = io.WriteString(w, fmt.Sprintf("http://localhost:8080/%v", linkid))
+	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
+	if err != nil {
+		panic(err)
+	}
+	_, err = io.WriteString(w, shorturl)
 	if err != nil {
 		panic(err)
 	}
