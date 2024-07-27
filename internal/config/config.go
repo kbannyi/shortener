@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
 	"os"
 )
 
@@ -23,9 +22,6 @@ func ParseConfig() Flags {
 	if envBaseAddr := os.Getenv("BASE_URL"); envBaseAddr != "" {
 		flags.RedirectBaseAddr = envBaseAddr
 	}
-
-	fmt.Println("Running on:", flags.RunAddr)
-	fmt.Println("Base for short links:", flags.RedirectBaseAddr)
 
 	return flags
 }
