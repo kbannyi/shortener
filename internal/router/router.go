@@ -1,13 +1,15 @@
 package router
 
 import (
-	"fmt"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/go-chi/chi"
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/logger"
+	"github.com/kbannyi/shortener/internal/models"
 )
 
 type URLRouter struct {
@@ -26,6 +28,7 @@ func NewURLRouter(s Service, c config.Flags) *URLRouter {
 
 	r.Get("/{id}", r.handleGet)
 	r.Post("/", r.handlePost)
+	r.Post("/api/shorten", r.handlePostJSON)
 
 	return &r
 }
@@ -42,22 +45,21 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Shortening link %q\n", link)
-	w.WriteHeader(http.StatusCreated)
 	linkid := router.Service.Create(link)
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.WriteHeader(http.StatusCreated)
 	_, err = io.WriteString(w, shorturl)
 	if err != nil {
-		panic(err)
+		logger.Log.Errorf("Response write failed: %v", err)
 	}
 }
 
 func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
 	linkid := chi.URLParam(r, "id")
-	fmt.Printf("Getting link %q\n", linkid)
 
 	if len(linkid) == 0 {
 		http.Error(w, "Link id can't be empty", http.StatusBadRequest)
@@ -71,4 +73,30 @@ func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, link, http.StatusTemporaryRedirect)
+}
+
+func (router *URLRouter) handlePostJSON(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var reqmodel models.ShortenRequest
+	if err := decoder.Decode(&reqmodel); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if reqmodel.URL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+	}
+
+	linkid := router.Service.Create(reqmodel.URL)
+	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	encoder := json.NewEncoder(w)
+	resmodel := models.ShortenResponse{Result: shorturl}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := encoder.Encode(&resmodel); err != nil {
+		logger.Log.Errorf("Response write failed: %v", err)
+	}
 }
