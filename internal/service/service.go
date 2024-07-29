@@ -30,5 +30,5 @@ func (s *URLService) Get(ID string) (string, bool) {
 		return "", ok
 	}
 
-	return v.Value, ok
+	return v.Original, ok
 }

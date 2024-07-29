@@ -18,14 +18,20 @@ func main() {
 	}
 	logger.Log.Infow("Running on:", "url", flags.RunAddr)
 	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
+	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 
 	logger.Log.Info("Starting server...")
-	var h http.Handler = router.NewURLRouter(service.NewService(repository.NewRepository()), flags)
+	repo, err := repository.NewRepository(flags)
+	if err != nil {
+		logger.Log.Error(err)
+		return
+	}
+	serv := service.NewService(repo)
+	var h http.Handler = router.NewURLRouter(serv, flags)
 	h = middleware.ResponseLoggerMiddleware(h)
 	h = middleware.RequestLoggerMiddleware(h)
 	h = middleware.GZIPMiddleware(h)
-	err := http.ListenAndServe(flags.RunAddr, h)
-	if err != nil {
+	if http.ListenAndServe(flags.RunAddr, h) != nil {
 		logger.Log.Error("Error on serve: %v", err)
 	}
 }
