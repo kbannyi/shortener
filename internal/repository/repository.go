@@ -12,24 +12,26 @@ import (
 )
 
 type URLRepository struct {
-	byID map[string]*domain.URL
-	mu   sync.RWMutex
+	byID            map[string]*domain.URL
+	mu              sync.RWMutex
+	fileStoragePath string
 }
 
 func NewRepository(flags config.Flags) (*URLRepository, error) {
 	repo := &URLRepository{
-		byID: make(map[string]*domain.URL),
+		byID:            make(map[string]*domain.URL),
+		fileStoragePath: flags.FileStoragePath,
 	}
 
-	if err := repo.readIndex(flags.FileStoragePath); err != nil {
+	if err := repo.readIndex(); err != nil {
 		return nil, fmt.Errorf("couldn't open storage file: %w", err)
 	}
 
 	return repo, nil
 }
 
-func (r *URLRepository) readIndex(path string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o666)
+func (r *URLRepository) readIndex() error {
+	f, err := os.OpenFile(r.fileStoragePath, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return err
 	}
@@ -46,10 +48,42 @@ func (r *URLRepository) readIndex(path string) error {
 	return nil
 }
 
-func (r *URLRepository) Save(URL *domain.URL) {
+func (r *URLRepository) Save(url *domain.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byID[URL.ID] = URL
+	_, ok := r.byID[url.ID]
+	if ok {
+		return nil
+	}
+
+	if err := saveToIndex(url, r.fileStoragePath); err != nil {
+		return fmt.Errorf("couldn't write to storage file: %w", err)
+	}
+	r.byID[url.ID] = url
+
+	return nil
+}
+
+func saveToIndex(url *domain.URL, path string) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	writer := bufio.NewWriter(file)
+	defer file.Close()
+	var data []byte
+	data, err = json.Marshal(url)
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(data); err != nil {
+		return err
+	}
+	if err := writer.WriteByte('\n'); err != nil {
+		return err
+	}
+
+	return writer.Flush()
 }
 
 func (r *URLRepository) Get(ID string) (URL *domain.URL, ok bool) {

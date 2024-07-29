@@ -14,7 +14,7 @@ var TestURL = &domain.URL{
 	Original: "linkvalue",
 }
 
-func (r *MockRepository) Save(URL *domain.URL) {}
+func (r *MockRepository) Save(URL *domain.URL) error { return nil }
 
 func (r *MockRepository) Get(ID string) (URL *domain.URL, ok bool) {
 	URL = TestURL
@@ -26,7 +26,8 @@ func (r *MockRepository) Get(ID string) (URL *domain.URL, ok bool) {
 func TestCreate_ReturnsNonEmptyId(t *testing.T) {
 	s := NewService(&MockRepository{})
 
-	ID := s.Create(TestURL.Original)
+	ID, err := s.Create(TestURL.Original)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, ID)
 }
 

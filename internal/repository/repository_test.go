@@ -15,7 +15,8 @@ func TestRepository_ReturnsSavedURLs(t *testing.T) {
 	const testValue = "testvalue"
 
 	URL := domain.NewURL(testValue)
-	r.Save(URL)
+	err = r.Save(URL)
+	assert.NoError(t, err)
 	v1, ok1 := r.Get(URL.ID)
 	v2, ok2 := r.Get("unknownid")
 

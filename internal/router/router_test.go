@@ -12,8 +12,8 @@ import (
 
 type MockService struct{}
 
-func (s *MockService) Create(value string) (ID string) {
-	return "mockid"
+func (s *MockService) Create(value string) (ID string, err error) {
+	return "mockid", nil
 }
 
 func (s *MockService) Get(ID string) (string, bool) {

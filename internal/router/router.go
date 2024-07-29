@@ -19,7 +19,7 @@ type URLRouter struct {
 }
 
 type Service interface {
-	Create(value string) (ID string)
+	Create(value string) (ID string, err error)
 	Get(ID string) (string, bool)
 }
 
@@ -45,7 +45,10 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	linkid := router.Service.Create(link)
+	linkid, err := router.Service.Create(link)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -86,7 +89,10 @@ func (router *URLRouter) handlePostJSON(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "url is required", http.StatusBadRequest)
 	}
 
-	linkid := router.Service.Create(reqmodel.URL)
+	linkid, err := router.Service.Create(reqmodel.URL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
