@@ -5,6 +5,7 @@ import (
 
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/logger"
+	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/repository"
 	"github.com/kbannyi/shortener/internal/router"
 	"github.com/kbannyi/shortener/internal/service"
@@ -20,8 +21,9 @@ func main() {
 
 	logger.Log.Info("Starting server...")
 	var h http.Handler = router.NewURLRouter(service.NewService(repository.NewRepository()), flags)
-	h = logger.ResponseLogger(h)
-	h = logger.RequestLogger(h)
+	h = middleware.ResponseLoggerMiddleware(h)
+	h = middleware.RequestLoggerMiddleware(h)
+	h = middleware.GZIPMiddleware(h)
 	err := http.ListenAndServe(flags.RunAddr, h)
 	if err != nil {
 		logger.Log.Error("Error on serve: %v", err)
