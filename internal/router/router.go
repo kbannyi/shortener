@@ -41,15 +41,16 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	linkid := router.Service.Create(link)
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.WriteHeader(http.StatusCreated)
 	_, err = io.WriteString(w, shorturl)
 	if err != nil {
-		panic(err)
+		logger.Log.Errorf("Response write failed: %v", err)
 	}
 }
 

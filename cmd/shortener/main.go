@@ -13,10 +13,10 @@ import (
 func main() {
 	flags := config.ParseConfig()
 	if err := logger.Initialize("Debug"); err != nil {
-		panic(err)
+		logger.Log.Errorf("Coudn't initialize logger: %v", err)
 	}
-	logger.Log.Info("Running on:", "url", flags.RunAddr)
-	logger.Log.Info("Base for short links:", "url", flags.RedirectBaseAddr)
+	logger.Log.Infow("Running on:", "url", flags.RunAddr)
+	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
 
 	logger.Log.Info("Starting server...")
 	var h http.Handler = router.NewURLRouter(service.NewService(repository.NewRepository()), flags)
@@ -24,6 +24,6 @@ func main() {
 	h = logger.RequestLogger(h)
 	err := http.ListenAndServe(flags.RunAddr, h)
 	if err != nil {
-		panic(err)
+		logger.Log.Error("Error on serve: %v", err)
 	}
 }
