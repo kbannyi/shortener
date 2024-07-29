@@ -1,7 +1,6 @@
 package router
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -42,7 +41,6 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Shortening link %q\n", link)
 	w.WriteHeader(http.StatusCreated)
 	linkid := router.Service.Create(link)
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
@@ -57,7 +55,6 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 
 func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
 	linkid := chi.URLParam(r, "id")
-	fmt.Printf("Getting link %q\n", linkid)
 
 	if len(linkid) == 0 {
 		http.Error(w, "Link id can't be empty", http.StatusBadRequest)
