@@ -48,6 +48,7 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 	linkid, err := router.Service.Create(link)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
@@ -58,6 +59,7 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 	_, err = io.WriteString(w, shorturl)
 	if err != nil {
 		logger.Log.Errorf("Response write failed: %v", err)
+		return
 	}
 }
 
@@ -87,11 +89,13 @@ func (router *URLRouter) handlePostJSON(w http.ResponseWriter, r *http.Request) 
 	}
 	if reqmodel.URL == "" {
 		http.Error(w, "url is required", http.StatusBadRequest)
+		return
 	}
 
 	linkid, err := router.Service.Create(reqmodel.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
@@ -104,5 +108,6 @@ func (router *URLRouter) handlePostJSON(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusCreated)
 	if err := encoder.Encode(&resmodel); err != nil {
 		logger.Log.Errorf("Response write failed: %v", err)
+		return
 	}
 }

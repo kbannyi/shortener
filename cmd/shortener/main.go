@@ -15,6 +15,7 @@ func main() {
 	flags := config.ParseConfig()
 	if err := logger.Initialize("Debug"); err != nil {
 		logger.Log.Errorf("Coudn't initialize logger: %v", err)
+		return
 	}
 	logger.Log.Infow("Running on:", "url", flags.RunAddr)
 	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
@@ -23,7 +24,7 @@ func main() {
 	logger.Log.Info("Starting server...")
 	repo, err := repository.NewRepository(flags)
 	if err != nil {
-		logger.Log.Error(err)
+		logger.Log.Errorf("Coudn't initialize repository: %v", err)
 		return
 	}
 	serv := service.NewService(repo)
@@ -32,6 +33,6 @@ func main() {
 	h = middleware.RequestLoggerMiddleware(h)
 	h = middleware.GZIPMiddleware(h)
 	if http.ListenAndServe(flags.RunAddr, h) != nil {
-		logger.Log.Error("Error on serve: %v", err)
+		logger.Log.Errorf("Error on serve: %v", err)
 	}
 }
