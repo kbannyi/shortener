@@ -6,15 +6,17 @@ import (
 )
 
 type URL struct {
-	ID    string
-	Value string
+	ID       string `json:"uuid"`
+	Short    string `json:"short_url"`
+	Original string `json:"original_url"`
 }
 
 func NewURL(value string) *URL {
-
+	hash := GetMD5Hash(value)[:8]
 	return &URL{
-		ID:    GetMD5Hash(value)[:8],
-		Value: value,
+		ID:       hash,
+		Short:    hash,
+		Original: value,
 	}
 }
 

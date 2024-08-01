@@ -24,3 +24,4 @@ vendor/
 
 bin/
 Makefile
+index.json

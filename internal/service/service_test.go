@@ -10,11 +10,11 @@ import (
 type MockRepository struct{}
 
 var TestURL = &domain.URL{
-	ID:    "testid",
-	Value: "linkvalue",
+	ID:       "testid",
+	Original: "linkvalue",
 }
 
-func (r *MockRepository) Save(URL *domain.URL) {}
+func (r *MockRepository) Save(URL *domain.URL) error { return nil }
 
 func (r *MockRepository) Get(ID string) (URL *domain.URL, ok bool) {
 	URL = TestURL
@@ -26,7 +26,8 @@ func (r *MockRepository) Get(ID string) (URL *domain.URL, ok bool) {
 func TestCreate_ReturnsNonEmptyId(t *testing.T) {
 	s := NewService(&MockRepository{})
 
-	ID := s.Create(TestURL.Value)
+	ID, err := s.Create(TestURL.Original)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, ID)
 }
 
@@ -35,7 +36,7 @@ func TestGet_ReturnsKnownValue(t *testing.T) {
 	v1, ok1 := s.Get(TestURL.ID)
 	v2, ok2 := s.Get("unknownid")
 
-	assert.Equal(t, v1, TestURL.Value)
+	assert.Equal(t, v1, TestURL.Original)
 	assert.True(t, ok1)
 	assert.Empty(t, v2)
 	assert.False(t, ok2)

@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/logger"
+	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/repository"
 	"github.com/kbannyi/shortener/internal/router"
 	"github.com/kbannyi/shortener/internal/service"
@@ -12,11 +13,26 @@ import (
 
 func main() {
 	flags := config.ParseConfig()
+	if err := logger.Initialize("Debug"); err != nil {
+		logger.Log.Errorf("Coudn't initialize logger: %v", err)
+		return
+	}
+	logger.Log.Infow("Running on:", "url", flags.RunAddr)
+	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
+	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 
-	fmt.Println("Starting server...")
-	err := http.ListenAndServe(flags.RunAddr,
-		router.NewURLRouter(service.NewService(repository.NewRepository()), flags))
+	logger.Log.Info("Starting server...")
+	repo, err := repository.NewRepository(flags)
 	if err != nil {
-		panic(err)
+		logger.Log.Errorf("Coudn't initialize repository: %v", err)
+		return
+	}
+	serv := service.NewService(repo)
+	var h http.Handler = router.NewURLRouter(serv, flags)
+	h = middleware.ResponseLoggerMiddleware(h)
+	h = middleware.RequestLoggerMiddleware(h)
+	h = middleware.GZIPMiddleware(h)
+	if http.ListenAndServe(flags.RunAddr, h) != nil {
+		logger.Log.Errorf("Error on serve: %v", err)
 	}
 }
