@@ -12,8 +12,8 @@ import (
 
 type MockService struct{}
 
-func (s *MockService) Create(value string) (ID string) {
-	return "mockid"
+func (s *MockService) Create(value string) (ID string, err error) {
+	return "mockid", nil
 }
 
 func (s *MockService) Get(ID string) (string, bool) {
@@ -51,6 +51,13 @@ func TestURLRouter(t *testing.T) {
 			expectedCode: http.StatusCreated,
 		},
 		{
+			method:       http.MethodPost,
+			request:      "/api/shorten",
+			body:         `{"url": "https://go.dev/doc/effective_go#allocation_new"}`,
+			expectedBody: `{"result":"http://localhost:8080/mockid"}`,
+			expectedCode: http.StatusCreated,
+		},
+		{
 			method:       http.MethodPut,
 			request:      "/",
 			expectedCode: http.StatusMethodNotAllowed,
@@ -73,7 +80,7 @@ func TestURLRouter(t *testing.T) {
 			router.ServeHTTP(w, r)
 			assert.Equal(t, tc.expectedCode, w.Code)
 			if tc.expectedBody != "" {
-				assert.Equal(t, tc.expectedBody, w.Body.String())
+				assert.Equal(t, strings.Trim(tc.expectedBody, "\n"), strings.Trim(w.Body.String(), "\n"))
 			}
 		})
 	}
