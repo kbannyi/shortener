@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/kbannyi/shortener/internal/config"
@@ -13,15 +14,12 @@ import (
 
 func main() {
 	flags := config.ParseConfig()
+
 	if err := logger.Initialize("Debug"); err != nil {
-		logger.Log.Errorf("Coudn't initialize logger: %v", err)
+		fmt.Printf("Coudn't initialize logger: %v\n", err)
 		return
 	}
-	logger.Log.Infow("Running on:", "url", flags.RunAddr)
-	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
-	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 
-	logger.Log.Info("Starting server...")
 	repo, err := repository.NewRepository(flags)
 	if err != nil {
 		logger.Log.Errorf("Coudn't initialize repository: %v", err)
@@ -32,6 +30,11 @@ func main() {
 	h = middleware.ResponseLoggerMiddleware(h)
 	h = middleware.RequestLoggerMiddleware(h)
 	h = middleware.GZIPMiddleware(h)
+
+	logger.Log.Info("Starting server...")
+	logger.Log.Infow("Running on:", "url", flags.RunAddr)
+	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
+	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 	if http.ListenAndServe(flags.RunAddr, h) != nil {
 		logger.Log.Errorf("Error on serve: %v", err)
 	}
