@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi"
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/middleware"
@@ -26,16 +27,17 @@ func main() {
 		return
 	}
 	serv := service.NewService(repo)
-	var h http.Handler = router.NewURLRouter(serv, flags)
-	h = middleware.ResponseLoggerMiddleware(h)
-	h = middleware.RequestLoggerMiddleware(h)
-	h = middleware.GZIPMiddleware(h)
+	r := chi.NewRouter()
+	r.Use(middleware.RequestLoggerMiddleware)
+	r.Use(middleware.ResponseLoggerMiddleware)
+	r.Use(middleware.GZIPMiddleware)
+	r.Mount("/", router.NewURLRouter(serv, flags))
 
 	logger.Log.Info("Starting server...")
 	logger.Log.Infow("Running on:", "url", flags.RunAddr)
 	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
 	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
-	if http.ListenAndServe(flags.RunAddr, h) != nil {
+	if http.ListenAndServe(flags.RunAddr, r) != nil {
 		logger.Log.Errorf("Error on serve: %v", err)
 	}
 }
