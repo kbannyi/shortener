@@ -19,10 +19,10 @@ func MigrateDB(db *sql.DB) error {
 	}
 	logger.Log.Debug("migrating db...")
 	tx, err := db.Begin()
-	defer tx.Rollback()
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 	for _, file := range files {
 		err = applysql(tx, filepath.Join(migrationsFolder, file.Name()))
 		if err != nil {
