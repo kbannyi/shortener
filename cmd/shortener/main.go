@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/dbtools"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/repository"
@@ -34,6 +35,11 @@ func main() {
 			return
 		}
 		defer db.Close()
+		err = dbtools.MigrateDB(db)
+		if err != nil {
+			logger.Log.Errorf("Unable to apply database migrations: %v\n", err)
+			return
+		}
 	}
 
 	repo, err := repository.NewFileURLRepository(flags)
