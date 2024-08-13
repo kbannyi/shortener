@@ -16,7 +16,7 @@ func ParseConfig() Flags {
 	flags := Flags{}
 	flag.StringVar(&flags.RunAddr, "a", ":8080", "address and port to run server")
 	flag.StringVar(&flags.RedirectBaseAddr, "b", "http://localhost:8080/", "base for short links")
-	flag.StringVar(&flags.FileStoragePath, "f", "index.json", "path to file storage")
+	flag.StringVar(&flags.FileStoragePath, "f", "", "path to file storage")
 	flag.StringVar(&flags.DatabaseURI, "d", "", "db connection string")
 	flag.Parse()
 

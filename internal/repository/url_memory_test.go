@@ -4,14 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFileURLRepository_ReturnsSavedURLs(t *testing.T) {
-	tempdir := t.TempDir()
-	r, err := NewFileURLRepository(config.Flags{FileStoragePath: tempdir + "/index_test.json"})
+func TestMemoryURLRepository_ReturnsSavedURLs(t *testing.T) {
+	r, err := NewMemoryURLRepository()
 	assert.NoError(t, err)
 	const testValue = "testvalue"
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/kbannyi/shortener/internal/domain"
@@ -14,9 +15,9 @@ var TestURL = &domain.URL{
 	Original: "linkvalue",
 }
 
-func (r *MockRepository) Save(URL *domain.URL) error { return nil }
+func (r *MockRepository) Save(ctx context.Context, URL *domain.URL) error { return nil }
 
-func (r *MockRepository) Get(ID string) (URL *domain.URL, ok bool) {
+func (r *MockRepository) Get(ctx context.Context, ID string) (URL *domain.URL, ok bool) {
 	URL = TestURL
 	ok = ID == URL.ID
 

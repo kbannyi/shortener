@@ -1,14 +1,15 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/kbannyi/shortener/internal/domain"
 )
 
 type Repository interface {
-	Save(*domain.URL) error
-	Get(ID string) (*domain.URL, bool)
+	Save(ctx context.Context, url *domain.URL) error
+	Get(ctx context.Context, id string) (*domain.URL, bool)
 }
 
 type URLService struct {
@@ -21,7 +22,7 @@ func NewService(r Repository) *URLService {
 
 func (s *URLService) Create(value string) (ID string, err error) {
 	URL := domain.NewURL(value)
-	if err := s.Repository.Save(URL); err != nil {
+	if err := s.Repository.Save(context.TODO(), URL); err != nil {
 		return "", fmt.Errorf("coudln't save domain.URL: %w", err)
 	}
 
@@ -29,7 +30,7 @@ func (s *URLService) Create(value string) (ID string, err error) {
 }
 
 func (s *URLService) Get(ID string) (string, bool) {
-	v, ok := s.Repository.Get(ID)
+	v, ok := s.Repository.Get(context.TODO(), ID)
 	if !ok {
 		return "", ok
 	}

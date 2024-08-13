@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/dbtools"
 	"github.com/kbannyi/shortener/internal/logger"
@@ -27,6 +28,7 @@ func main() {
 	}
 
 	var db *sql.DB
+	var dbx *sqlx.DB
 	var err error
 	if flags.DatabaseURI != "" {
 		db, err = sql.Open("pgx", flags.DatabaseURI)
@@ -40,9 +42,20 @@ func main() {
 			logger.Log.Errorf("Unable to apply database migrations: %v\n", err)
 			return
 		}
+		dbx = sqlx.NewDb(db, "pgx")
 	}
-
-	repo, err := repository.NewFileURLRepository(flags)
+	var repo service.Repository
+	switch {
+	case dbx != nil:
+		repo, err = repository.NewPostgresUserRepository(dbx)
+		logger.Log.Info("Using DB storage")
+	case flags.FileStoragePath != "":
+		repo, err = repository.NewFileURLRepository(flags)
+		logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
+	default:
+		repo, err = repository.NewMemoryURLRepository()
+		logger.Log.Info("Using InMemory storage")
+	}
 	if err != nil {
 		logger.Log.Errorf("Coudn't initialize repository: %v", err)
 		return
@@ -58,7 +71,6 @@ func main() {
 	logger.Log.Info("Starting server...")
 	logger.Log.Infow("Running on:", "url", flags.RunAddr)
 	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
-	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 	if http.ListenAndServe(flags.RunAddr, r) != nil {
 		logger.Log.Errorf("Error on serve: %v", err)
 	}

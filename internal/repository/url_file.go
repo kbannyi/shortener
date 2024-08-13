@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -48,7 +49,7 @@ func (r *FileURLRepository) readIndex() error {
 	return nil
 }
 
-func (r *FileURLRepository) Save(url *domain.URL) error {
+func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	_, ok := r.byID[url.ID]
@@ -86,7 +87,7 @@ func saveToIndex(url *domain.URL, path string) error {
 	return writer.Flush()
 }
 
-func (r *FileURLRepository) Get(ID string) (URL *domain.URL, ok bool) {
+func (r *FileURLRepository) Get(ctx context.Context, ID string) (URL *domain.URL, ok bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	URL, ok = r.byID[ID]
