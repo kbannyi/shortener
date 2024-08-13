@@ -11,14 +11,14 @@ import (
 	"github.com/kbannyi/shortener/internal/domain"
 )
 
-type URLRepository struct {
+type FileURLRepository struct {
 	byID            map[string]*domain.URL
 	mu              sync.RWMutex
 	fileStoragePath string
 }
 
-func NewRepository(flags config.Flags) (*URLRepository, error) {
-	repo := &URLRepository{
+func NewFileURLRepository(flags config.Flags) (*FileURLRepository, error) {
+	repo := &FileURLRepository{
 		byID:            make(map[string]*domain.URL),
 		fileStoragePath: flags.FileStoragePath,
 	}
@@ -30,7 +30,7 @@ func NewRepository(flags config.Flags) (*URLRepository, error) {
 	return repo, nil
 }
 
-func (r *URLRepository) readIndex() error {
+func (r *FileURLRepository) readIndex() error {
 	f, err := os.OpenFile(r.fileStoragePath, os.O_CREATE|os.O_RDWR, 0o666)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func (r *URLRepository) readIndex() error {
 	return nil
 }
 
-func (r *URLRepository) Save(url *domain.URL) error {
+func (r *FileURLRepository) Save(url *domain.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	_, ok := r.byID[url.ID]
@@ -86,7 +86,7 @@ func saveToIndex(url *domain.URL, path string) error {
 	return writer.Flush()
 }
 
-func (r *URLRepository) Get(ID string) (URL *domain.URL, ok bool) {
+func (r *FileURLRepository) Get(ID string) (URL *domain.URL, ok bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	URL, ok = r.byID[ID]

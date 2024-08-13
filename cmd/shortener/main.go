@@ -36,7 +36,7 @@ func main() {
 		defer db.Close()
 	}
 
-	repo, err := repository.NewRepository(flags)
+	repo, err := repository.NewFileURLRepository(flags)
 	if err != nil {
 		logger.Log.Errorf("Coudn't initialize repository: %v", err)
 		return

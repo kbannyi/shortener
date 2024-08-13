@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRepository_ReturnsSavedURLs(t *testing.T) {
+func TestFileURLRepository_ReturnsSavedURLs(t *testing.T) {
 	tempdir := t.TempDir()
-	r, err := NewRepository(config.Flags{FileStoragePath: tempdir + "/index_test.json"})
+	r, err := NewFileURLRepository(config.Flags{FileStoragePath: tempdir + "/index_test.json"})
 	assert.NoError(t, err)
 	const testValue = "testvalue"
 
