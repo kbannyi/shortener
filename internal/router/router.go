@@ -26,14 +26,16 @@ type Service interface {
 func NewURLRouter(s Service, c config.Flags) *URLRouter {
 	r := URLRouter{chi.NewRouter(), s, c}
 
-	r.Get("/{id}", r.handleGet)
-	r.Post("/", r.handlePost)
-	r.Post("/api/shorten", r.handlePostJSON)
+	r.Get("/{id}", r.getByID)
+	r.Post("/", r.createFromText)
+
+	// JSON-based:
+	r.Post("/api/shorten", r.create)
 
 	return &r
 }
 
-func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
+func (router *URLRouter) createFromText(w http.ResponseWriter, r *http.Request) {
 	linkBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't read body", http.StatusBadRequest)
@@ -63,7 +65,7 @@ func (router *URLRouter) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
+func (router *URLRouter) getByID(w http.ResponseWriter, r *http.Request) {
 	linkid := chi.URLParam(r, "id")
 
 	if len(linkid) == 0 {
@@ -80,7 +82,7 @@ func (router *URLRouter) handleGet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 }
 
-func (router *URLRouter) handlePostJSON(w http.ResponseWriter, r *http.Request) {
+func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var reqmodel models.ShortenRequest
 	if err := decoder.Decode(&reqmodel); err != nil {
