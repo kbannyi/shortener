@@ -57,7 +57,7 @@ func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 		return nil
 	}
 
-	if err := saveToIndex(url, r.fileStoragePath); err != nil {
+	if err := saveToIndex([]*domain.URL{url}, r.fileStoragePath); err != nil {
 		return fmt.Errorf("couldn't write to storage file: %w", err)
 	}
 	r.byID[url.ID] = url
@@ -65,23 +65,52 @@ func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	return nil
 }
 
-func saveToIndex(url *domain.URL, path string) error {
+func (r *FileURLRepository) BatchSave(ctx context.Context, urls []*domain.URL) error {
+	batch := make([]*domain.URL, 0, len(urls))
+	for _, url := range urls {
+		_, ok := r.byID[url.ID]
+		if ok {
+			continue
+		}
+		batch = append(batch, url)
+	}
+
+	if len(batch) == 0 {
+		return nil
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := saveToIndex(batch, r.fileStoragePath); err != nil {
+		return fmt.Errorf("couldn't write to storage file: %w", err)
+	}
+
+	for _, url := range batch {
+		r.byID[url.ID] = url
+	}
+
+	return nil
+}
+
+func saveToIndex(urls []*domain.URL, path string) error {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}
 	writer := bufio.NewWriter(file)
 	defer file.Close()
-	var data []byte
-	data, err = json.Marshal(url)
-	if err != nil {
-		return err
-	}
-	if _, err := writer.Write(data); err != nil {
-		return err
-	}
-	if err := writer.WriteByte('\n'); err != nil {
-		return err
+	for _, url := range urls {
+		var data []byte
+		data, err = json.Marshal(url)
+		if err != nil {
+			return err
+		}
+		if _, err := writer.Write(data); err != nil {
+			return err
+		}
+		if err := writer.WriteByte('\n'); err != nil {
+			return err
+		}
 	}
 
 	return writer.Flush()

@@ -3,12 +3,16 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/domain"
+	"github.com/kbannyi/shortener/internal/models"
 	"github.com/kbannyi/shortener/internal/router"
 	"github.com/stretchr/testify/require"
 )
@@ -21,6 +25,10 @@ func (s *MockService) Create(value string) (ID string, err error) {
 
 func (s *MockService) Get(ID string) (string, bool) {
 	return "redirect", ID == "mockid"
+}
+
+func (s *MockService) BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error) {
+	return nil, errors.New("not impl")
 }
 
 func TestGzipCompression(t *testing.T) {

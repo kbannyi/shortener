@@ -28,6 +28,16 @@ func (r *PostgresURLRepository) Save(ctx context.Context, url *domain.URL) error
 	return nil
 }
 
+func (r *PostgresURLRepository) BatchSave(ctx context.Context, urls []*domain.URL) error {
+	_, err := r.db.NamedExecContext(ctx, `INSERT INTO url (id, short_url, original_url)
+	VALUES (:id, :short_url, :original_url)`, urls)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *PostgresURLRepository) Get(ctx context.Context, id string) (*domain.URL, bool) {
 	URL := domain.URL{}
 	err := r.db.GetContext(ctx, &URL, `SELECT * FROM url WHERE id = $1 LIMIT 1`, id)

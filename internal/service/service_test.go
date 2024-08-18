@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/kbannyi/shortener/internal/domain"
@@ -22,6 +23,10 @@ func (r *MockRepository) Get(ctx context.Context, ID string) (URL *domain.URL, o
 	ok = ID == URL.ID
 
 	return
+}
+
+func (r *MockRepository) BatchSave(ctx context.Context, urls []*domain.URL) error {
+	return errors.New("not implemented")
 }
 
 func TestCreate_ReturnsNonEmptyId(t *testing.T) {

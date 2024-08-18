@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/kbannyi/shortener/internal/domain"
+	"github.com/kbannyi/shortener/internal/models"
 )
 
 type Repository interface {
 	Save(ctx context.Context, url *domain.URL) error
+	BatchSave(ctx context.Context, urls []*domain.URL) error
 	Get(ctx context.Context, id string) (*domain.URL, bool)
 }
 
@@ -36,4 +39,24 @@ func (s *URLService) Get(ID string) (string, bool) {
 	}
 
 	return v.Original, ok
+}
+
+func (s *URLService) BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error) {
+	results := make(map[string]*domain.URL, len(correlated))
+	batch := make([]*domain.URL, 0, len(correlated))
+	for _, orig := range correlated {
+		_, ok := results[orig.CorrelationID]
+		if ok {
+			return nil, errors.New("correlationId duplicate")
+		}
+		url := domain.NewURL(orig.Value)
+		results[orig.CorrelationID] = url
+		batch = append(batch, url)
+	}
+	err := s.Repository.BatchSave(ctx, batch)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }

@@ -1,12 +1,15 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/domain"
+	"github.com/kbannyi/shortener/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,6 +17,10 @@ type MockService struct{}
 
 func (s *MockService) Create(value string) (ID string, err error) {
 	return "mockid", nil
+}
+
+func (s *MockService) BatchCreate(ctx context.Context, urls []models.CorrelatedURL) (map[string]*domain.URL, error) {
+	return map[string]*domain.URL{"1": {Short: "1"}, "2": {Short: "2"}}, nil
 }
 
 func (s *MockService) Get(ID string) (string, bool) {
@@ -55,6 +62,13 @@ func TestURLRouter(t *testing.T) {
 			request:      "/api/shorten",
 			body:         `{"url": "https://go.dev/doc/effective_go#allocation_new"}`,
 			expectedBody: `{"result":"http://localhost:8080/mockid"}`,
+			expectedCode: http.StatusCreated,
+		},
+		{
+			method:       http.MethodPost,
+			request:      "/api/shorten/batch",
+			body:         `[{"correlation_id": "1","original_url":"1"},{"correlation_id": "2","original_url":"2"}]`,
+			expectedBody: `[{"correlation_id":"1","short_url":"http://localhost:8080/1"},{"correlation_id":"2","short_url":"http://localhost:8080/2"}]`,
 			expectedCode: http.StatusCreated,
 		},
 		{

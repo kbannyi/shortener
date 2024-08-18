@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/kbannyi/shortener/internal/dto"
 	"github.com/kbannyi/shortener/internal/logger"
+	"github.com/kbannyi/shortener/internal/models"
 )
 
 type URLRouter struct {
@@ -21,6 +24,7 @@ type URLRouter struct {
 type Service interface {
 	Create(value string) (ID string, err error)
 	Get(ID string) (string, bool)
+	BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error)
 }
 
 func NewURLRouter(s Service, c config.Flags) *URLRouter {
@@ -31,6 +35,7 @@ func NewURLRouter(s Service, c config.Flags) *URLRouter {
 
 	// JSON-based:
 	r.Post("/api/shorten", r.create)
+	r.Post("/api/shorten/batch", r.batchCreate)
 
 	return &r
 }
@@ -109,6 +114,56 @@ func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := encoder.Encode(&resmodel); err != nil {
+		logger.Log.Errorf("Response write failed: %v", err)
+		return
+	}
+}
+
+func (router *URLRouter) batchCreate(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var request []dto.BatchRequestURL
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(request) == 0 {
+		http.Error(w, "request is empty", http.StatusBadRequest)
+		return
+	}
+
+	correlated := make([]models.CorrelatedURL, 0, len(request))
+	for _, url := range request {
+		if url.CorrelationID == "" || url.OriginalURL == "" {
+			http.Error(w, "correlation_id and original_id are required", http.StatusBadRequest)
+			return
+		}
+		correlated = append(correlated, models.CorrelatedURL{
+			CorrelationID: url.CorrelationID,
+			Value:         url.OriginalURL,
+		})
+	}
+
+	urls, err := router.Service.BatchCreate(r.Context(), correlated)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response := make([]dto.BatchResponseURL, 0, len(correlated))
+	for _, orig := range request {
+		shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, urls[orig.CorrelationID].Short)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response = append(response, dto.BatchResponseURL{
+			CorrelationID: orig.CorrelationID,
+			ShortURL:      shorturl,
+		})
+	}
+	encoder := json.NewEncoder(w)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := encoder.Encode(&response); err != nil {
 		logger.Log.Errorf("Response write failed: %v", err)
 		return
 	}
