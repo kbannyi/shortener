@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/dto"
 	"github.com/kbannyi/shortener/internal/logger"
-	"github.com/kbannyi/shortener/internal/models"
 )
 
 type URLRouter struct {
@@ -84,7 +84,7 @@ func (router *URLRouter) getByID(w http.ResponseWriter, r *http.Request) {
 
 func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var reqmodel models.ShortenRequest
+	var reqmodel dto.ShortenRequest
 	if err := decoder.Decode(&reqmodel); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -105,7 +105,7 @@ func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	encoder := json.NewEncoder(w)
-	resmodel := models.ShortenResponse{Result: shorturl}
+	resmodel := dto.ShortenResponse{Result: shorturl}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := encoder.Encode(&resmodel); err != nil {
