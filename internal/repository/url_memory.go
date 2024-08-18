@@ -18,10 +18,14 @@ func NewMemoryURLRepository() (*MemoryURLRepository, error) {
 	}, nil
 }
 
-func (r *MemoryURLRepository) Save(ctx context.Context, URL *domain.URL) error {
+func (r *MemoryURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byID[URL.ID] = URL
+	_, ok := r.byID[url.ID]
+	if ok {
+		return &DuplicateURLError{URL: url}
+	}
+	r.byID[url.ID] = url
 
 	return nil
 }

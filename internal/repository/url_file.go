@@ -54,7 +54,7 @@ func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	defer r.mu.Unlock()
 	_, ok := r.byID[url.ID]
 	if ok {
-		return nil
+		return &DuplicateURLError{URL: url}
 	}
 
 	if err := saveToIndex([]*domain.URL{url}, r.fileStoragePath); err != nil {

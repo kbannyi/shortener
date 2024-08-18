@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/kbannyi/shortener/internal/dto"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/models"
+	"github.com/kbannyi/shortener/internal/repository"
 )
 
 type URLRouter struct {
@@ -54,20 +56,27 @@ func (router *URLRouter) createFromText(w http.ResponseWriter, r *http.Request) 
 
 	linkid, err := router.Service.Create(link)
 	if err != nil {
+		var dupErr *repository.DuplicateURLError
+		if errors.As(err, &dupErr) {
+			w.WriteHeader(http.StatusConflict)
+			router.writeCreateFromTextResult(w, dupErr.URL.ID)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusCreated)
+	router.writeCreateFromTextResult(w, linkid)
+}
+
+func (router *URLRouter) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	_, err = io.WriteString(w, shorturl)
-	if err != nil {
-		logger.Log.Errorf("Response write failed: %v", err)
-		return
-	}
+	io.WriteString(w, shorturl)
 }
 
 func (router *URLRouter) getByID(w http.ResponseWriter, r *http.Request) {
@@ -101,9 +110,24 @@ func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 
 	linkid, err := router.Service.Create(reqmodel.URL)
 	if err != nil {
+		var dupErr *repository.DuplicateURLError
+		if errors.As(err, &dupErr) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+			router.writeCreateResult(w, dupErr.URL.ID)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	router.writeCreateResult(w, linkid)
+}
+
+func (router *URLRouter) writeCreateResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -111,8 +135,6 @@ func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 	}
 	encoder := json.NewEncoder(w)
 	resmodel := dto.ShortenResponse{Result: shorturl}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 	if err := encoder.Encode(&resmodel); err != nil {
 		logger.Log.Errorf("Response write failed: %v", err)
 		return
