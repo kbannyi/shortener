@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/kbannyi/shortener/internal/config"
-	"github.com/kbannyi/shortener/internal/dbtools"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/repository"
@@ -37,9 +39,19 @@ func main() {
 			return
 		}
 		defer db.Close()
-		err = dbtools.MigrateDB(db)
+		driver, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
-			logger.Log.Errorf("Unable to apply database migrations: %v\n", err)
+			logger.Log.Errorf("Unable to create migration driver: %v\n", err)
+			return
+		}
+		m, err := migrate.NewWithDatabaseInstance("file://db/migrations", "postgres", driver)
+		if err != nil {
+			logger.Log.Errorf("Unable to create migrator instance: %v\n", err)
+			return
+		}
+		err = m.Up()
+		if err != nil && err != migrate.ErrNoChange {
+			logger.Log.Errorf("Unable to apply migrations: %v\n", err)
 			return
 		}
 		dbx = sqlx.NewDb(db, "pgx")

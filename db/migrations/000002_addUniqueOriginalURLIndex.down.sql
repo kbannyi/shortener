@@ -1,0 +1,1 @@
+ALTER TABLE public.url DROP CONSTRAINT original_url_uniq;
