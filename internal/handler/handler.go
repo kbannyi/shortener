@@ -92,7 +92,11 @@ func (handler *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, link
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	io.WriteString(w, shorturl)
+	_, err = io.WriteString(w, shorturl)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (handler *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {

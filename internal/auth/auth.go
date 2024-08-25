@@ -19,7 +19,10 @@ type Claims struct {
 
 const tokenExp = time.Hour * 1
 const secretKey = "supersecretkey"
-const contextKey = "UserContext"
+
+type contextkey string
+
+const contextKey contextkey = "UserContext"
 
 var ErrNotAuthenticated = errors.New("not authenticated")
 
@@ -54,11 +57,14 @@ func BuildJWTString(user AuthUser) (string, error) {
 
 func ReadJWTString(tokenString string) (AuthUser, error) {
 	claims := &Claims{}
-	jwt.ParseWithClaims(tokenString,
+	_, err := jwt.ParseWithClaims(tokenString,
 		claims,
 		func(t *jwt.Token) (interface{}, error) {
 			return []byte(secretKey), nil
 		})
+	if err != nil {
+		return AuthUser{}, err
+	}
 
 	return AuthUser{UserID: claims.UserID}, nil
 }
