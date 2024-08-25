@@ -24,8 +24,9 @@ type URLHandler struct {
 }
 
 type Service interface {
-	Create(value string) (ID string, err error)
+	Create(ctx context.Context, value string) (ID string, err error)
 	Get(ID string) (string, bool)
+	GetByUser(ctx context.Context) ([]*domain.URL, error)
 	BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error)
 }
 
@@ -50,12 +51,14 @@ func NewURLHandler(s Service, c config.Flags) http.Handler {
 	// Require auth
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RequireAuthMiddleware)
+
+		r.Get("/api/user/urls", h.getByUser)
 	})
 
 	return r
 }
 
-func (router *URLHandler) createFromText(w http.ResponseWriter, r *http.Request) {
+func (handler *URLHandler) createFromText(w http.ResponseWriter, r *http.Request) {
 	linkBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't read body", http.StatusBadRequest)
@@ -67,12 +70,12 @@ func (router *URLHandler) createFromText(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	linkid, err := router.Service.Create(link)
+	linkid, err := handler.Service.Create(r.Context(), link)
 	if err != nil {
 		var dupErr *repository.DuplicateURLError
 		if errors.As(err, &dupErr) {
 			w.WriteHeader(http.StatusConflict)
-			router.writeCreateFromTextResult(w, dupErr.URL.ID)
+			handler.writeCreateFromTextResult(w, dupErr.URL.ID)
 			return
 		}
 
@@ -80,11 +83,11 @@ func (router *URLHandler) createFromText(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
-	router.writeCreateFromTextResult(w, linkid)
+	handler.writeCreateFromTextResult(w, linkid)
 }
 
-func (router *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
-	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
+func (handler *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
+	shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -92,7 +95,7 @@ func (router *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, linki
 	io.WriteString(w, shorturl)
 }
 
-func (router *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
+func (handler *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
 	linkid := chi.URLParam(r, "id")
 
 	if len(linkid) == 0 {
@@ -100,7 +103,7 @@ func (router *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, ok := router.Service.Get(linkid)
+	link, ok := handler.Service.Get(linkid)
 	if !ok {
 		http.Error(w, "Unknown link", http.StatusBadRequest)
 		return
@@ -109,7 +112,7 @@ func (router *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 }
 
-func (router *URLHandler) create(w http.ResponseWriter, r *http.Request) {
+func (handler *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var reqmodel dto.ShortenRequest
 	if err := decoder.Decode(&reqmodel); err != nil {
@@ -121,13 +124,13 @@ func (router *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	linkid, err := router.Service.Create(reqmodel.URL)
+	linkid, err := handler.Service.Create(r.Context(), reqmodel.URL)
 	if err != nil {
 		var dupErr *repository.DuplicateURLError
 		if errors.As(err, &dupErr) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
-			router.writeCreateResult(w, dupErr.URL.ID)
+			handler.writeCreateResult(w, dupErr.URL.ID)
 			return
 		}
 
@@ -137,11 +140,11 @@ func (router *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	router.writeCreateResult(w, linkid)
+	handler.writeCreateResult(w, linkid)
 }
 
-func (router *URLHandler) writeCreateResult(w http.ResponseWriter, linkid string) {
-	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
+func (handler *URLHandler) writeCreateResult(w http.ResponseWriter, linkid string) {
+	shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -154,7 +157,7 @@ func (router *URLHandler) writeCreateResult(w http.ResponseWriter, linkid string
 	}
 }
 
-func (router *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
+func (handler *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var request []dto.BatchRequestURL
 	if err := decoder.Decode(&request); err != nil {
@@ -178,14 +181,14 @@ func (router *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	urls, err := router.Service.BatchCreate(r.Context(), correlated)
+	urls, err := handler.Service.BatchCreate(r.Context(), correlated)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	response := make([]dto.BatchResponseURL, 0, len(correlated))
 	for _, orig := range request {
-		shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, urls[orig.CorrelationID].Short)
+		shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, urls[orig.CorrelationID].Short)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -198,6 +201,38 @@ func (router *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 	encoder := json.NewEncoder(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	if err := encoder.Encode(&response); err != nil {
+		logger.Log.Errorf("Response write failed: %v", err)
+		return
+	}
+}
+
+func (handler *URLHandler) getByUser(w http.ResponseWriter, r *http.Request) {
+	urls, err := handler.Service.GetByUser(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	response := make([]dto.UserResponseURL, 0, len(urls))
+	for _, u := range urls {
+		shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, u.Short)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response = append(response, dto.UserResponseURL{
+			OriginalURL: u.Original,
+			ShortURL:    shorturl,
+		})
+	}
+	encoder := json.NewEncoder(w)
+	w.Header().Set("Content-Type", "application/json")
 	if err := encoder.Encode(&response); err != nil {
 		logger.Log.Errorf("Response write failed: %v", err)
 		return

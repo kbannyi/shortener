@@ -21,8 +21,8 @@ func NewPostgresUserRepository(db *sqlx.DB) (*PostgresURLRepository, error) {
 }
 
 func (r *PostgresURLRepository) Save(ctx context.Context, url *domain.URL) error {
-	_, err := r.db.NamedExecContext(ctx, `INSERT INTO url (id, short_url, original_url)
-	VALUES (:id, :short_url, :original_url)`, url)
+	_, err := r.db.NamedExecContext(ctx, `INSERT INTO url (id, short_url, original_url, user_id)
+	VALUES (:id, :short_url, :original_url, :user_id)`, url)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgerrcode.UniqueViolation == pgErr.Code {
@@ -35,8 +35,8 @@ func (r *PostgresURLRepository) Save(ctx context.Context, url *domain.URL) error
 }
 
 func (r *PostgresURLRepository) BatchSave(ctx context.Context, urls []*domain.URL) error {
-	_, err := r.db.NamedExecContext(ctx, `INSERT INTO url (id, short_url, original_url)
-	VALUES (:id, :short_url, :original_url)`, urls)
+	_, err := r.db.NamedExecContext(ctx, `INSERT INTO url (id, short_url, original_url, user_id)
+	VALUES (:id, :short_url, :original_url, :user_id)`, urls)
 	if err != nil {
 		return err
 	}
@@ -52,4 +52,11 @@ func (r *PostgresURLRepository) Get(ctx context.Context, id string) (*domain.URL
 	}
 
 	return &URL, true
+}
+
+func (r *PostgresURLRepository) GetByUser(ctx context.Context, userid string) ([]*domain.URL, error) {
+	urls := []*domain.URL{}
+	err := r.db.SelectContext(ctx, &urls, "SELECT * FROM url WHERE user_id=$1", userid)
+
+	return urls, err
 }

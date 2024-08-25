@@ -15,7 +15,11 @@ import (
 
 type MockService struct{}
 
-func (s *MockService) Create(value string) (ID string, err error) {
+func (s *MockService) GetByUser(ctx context.Context) ([]*domain.URL, error) {
+	panic("unimplemented")
+}
+
+func (s *MockService) Create(ctx context.Context, value string) (ID string, err error) {
 	return "mockid", nil
 }
 
