@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	"github.com/kbannyi/shortener/internal/domain"
-	"github.com/kbannyi/shortener/internal/logger"
 )
 
 type PostgresURLRepository struct {
@@ -49,7 +48,6 @@ func (r *PostgresURLRepository) Get(ctx context.Context, id string) (*domain.URL
 	URL := domain.URL{}
 	err := r.db.GetContext(ctx, &URL, `SELECT * FROM url WHERE id = $1 LIMIT 1`, id)
 	if err != nil {
-		logger.Log.Errorf("couldn't get URL from db: %v", err)
 		return nil, false
 	}
 
