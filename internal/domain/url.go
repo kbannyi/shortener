@@ -6,9 +6,9 @@ import (
 )
 
 type URL struct {
-	ID       string `json:"uuid"`
-	Short    string `json:"short_url"`
-	Original string `json:"original_url"`
+	ID       string `json:"uuid" db:"id"`
+	Short    string `json:"short_url" db:"short_url"`
+	Original string `json:"original_url" db:"original_url"`
 }
 
 func NewURL(value string) *URL {

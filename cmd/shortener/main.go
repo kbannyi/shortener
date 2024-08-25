@@ -1,8 +1,18 @@
 package main
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/go-chi/chi"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/middleware"
@@ -13,26 +23,83 @@ import (
 
 func main() {
 	flags := config.ParseConfig()
+
 	if err := logger.Initialize("Debug"); err != nil {
-		logger.Log.Errorf("Coudn't initialize logger: %v", err)
+		fmt.Printf("Coudn't initialize logger: %v\n", err)
 		return
 	}
-	logger.Log.Infow("Running on:", "url", flags.RunAddr)
-	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
-	logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
 
-	logger.Log.Info("Starting server...")
-	repo, err := repository.NewRepository(flags)
+	var db *sql.DB
+	var dbx *sqlx.DB
+	var err error
+	if flags.DatabaseURI != "" {
+		db, err = sql.Open("pgx", flags.DatabaseURI)
+		if err != nil {
+			logger.Log.Errorf("Unable to connect to database: %v\n", err)
+			return
+		}
+		defer db.Close()
+		driver, err := postgres.WithInstance(db, &postgres.Config{})
+		if err != nil {
+			logger.Log.Errorf("Unable to create migration driver: %v\n", err)
+			return
+		}
+		m, err := migrate.NewWithDatabaseInstance("file://db/migrations", "postgres", driver)
+		if err != nil {
+			logger.Log.Errorf("Unable to create migrator instance: %v\n", err)
+			return
+		}
+		err = m.Up()
+		if err != nil && err != migrate.ErrNoChange {
+			logger.Log.Errorf("Unable to apply migrations: %v\n", err)
+			return
+		}
+		dbx = sqlx.NewDb(db, "pgx")
+	}
+	var repo service.Repository
+	switch {
+	case dbx != nil:
+		repo, err = repository.NewPostgresUserRepository(dbx)
+		logger.Log.Info("Using DB storage")
+	case flags.FileStoragePath != "":
+		repo, err = repository.NewFileURLRepository(flags)
+		logger.Log.Infow("Using storage file:", "path", flags.FileStoragePath)
+	default:
+		repo, err = repository.NewMemoryURLRepository()
+		logger.Log.Info("Using InMemory storage")
+	}
 	if err != nil {
 		logger.Log.Errorf("Coudn't initialize repository: %v", err)
 		return
 	}
 	serv := service.NewService(repo)
-	var h http.Handler = router.NewURLRouter(serv, flags)
-	h = middleware.ResponseLoggerMiddleware(h)
-	h = middleware.RequestLoggerMiddleware(h)
-	h = middleware.GZIPMiddleware(h)
-	if http.ListenAndServe(flags.RunAddr, h) != nil {
+	r := chi.NewRouter()
+	r.Use(middleware.RequestLoggerMiddleware)
+	r.Use(middleware.ResponseLoggerMiddleware)
+	r.Use(middleware.GZIPMiddleware)
+	r.Get("/ping", ping(db))
+	r.Mount("/", router.NewURLRouter(serv, flags))
+
+	logger.Log.Info("Starting server...")
+	logger.Log.Infow("Running on:", "url", flags.RunAddr)
+	logger.Log.Infow("Base for short links:", "url", flags.RedirectBaseAddr)
+	if http.ListenAndServe(flags.RunAddr, r) != nil {
 		logger.Log.Errorf("Error on serve: %v", err)
+	}
+}
+
+func ping(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if db == nil {
+			http.Error(w, "failed to connect to db", http.StatusInternalServerError)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		if err := db.PingContext(ctx); err != nil {
+			http.Error(w, "failed to connect to db", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
