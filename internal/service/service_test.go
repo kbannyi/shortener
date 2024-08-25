@@ -5,17 +5,21 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/kbannyi/shortener/internal/auth"
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
-
-type MockRepository struct{}
 
 var TestURL = &domain.URL{
 	ID:       "testid",
 	Original: "linkvalue",
 }
 
+type MockRepository struct{}
+
+func (r *MockRepository) GetByUser(ctx context.Context, id string) ([]*domain.URL, error) {
+	panic("unimplemented")
+}
 func (r *MockRepository) Save(ctx context.Context, URL *domain.URL) error { return nil }
 
 func (r *MockRepository) Get(ctx context.Context, ID string) (URL *domain.URL, ok bool) {
@@ -32,7 +36,7 @@ func (r *MockRepository) BatchSave(ctx context.Context, urls []*domain.URL) erro
 func TestCreate_ReturnsNonEmptyId(t *testing.T) {
 	s := NewService(&MockRepository{})
 
-	ID, err := s.Create(TestURL.Original)
+	ID, err := s.Create(auth.ToContext(context.Background(), auth.AuthUser{}), TestURL.Original)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, ID)
 }
