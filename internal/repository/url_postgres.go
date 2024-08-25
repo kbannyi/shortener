@@ -26,9 +26,9 @@ func (r *PostgresURLRepository) Save(ctx context.Context, url *domain.URL) error
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgerrcode.UniqueViolation == pgErr.Code {
-
 			return &DuplicateURLError{URL: url}
 		}
+		return err
 	}
 
 	return nil
