@@ -14,10 +14,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/kbannyi/shortener/internal/config"
+	"github.com/kbannyi/shortener/internal/handler"
 	"github.com/kbannyi/shortener/internal/logger"
 	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/repository"
-	"github.com/kbannyi/shortener/internal/router"
 	"github.com/kbannyi/shortener/internal/service"
 )
 
@@ -78,7 +78,7 @@ func main() {
 	r.Use(middleware.ResponseLoggerMiddleware)
 	r.Use(middleware.GZIPMiddleware)
 	r.Get("/ping", ping(db))
-	r.Mount("/", router.NewURLRouter(serv, flags))
+	r.Mount("/", handler.NewURLHandler(serv, flags))
 
 	logger.Log.Info("Starting server...")
 	logger.Log.Infow("Running on:", "url", flags.RunAddr)

@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"context"
@@ -87,7 +87,7 @@ func TestURLRouter(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, tc.request, strings.NewReader(tc.body))
 			w := httptest.NewRecorder()
-			router := NewURLRouter(&MockService{}, config.Flags{
+			router := NewURLHandler(&MockService{}, config.Flags{
 				RedirectBaseAddr: "http://localhost:8080/",
 			})
 

@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"context"
@@ -13,12 +13,12 @@ import (
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/kbannyi/shortener/internal/dto"
 	"github.com/kbannyi/shortener/internal/logger"
+	"github.com/kbannyi/shortener/internal/middleware"
 	"github.com/kbannyi/shortener/internal/models"
 	"github.com/kbannyi/shortener/internal/repository"
 )
 
-type URLRouter struct {
-	chi.Router
+type URLHandler struct {
 	Service Service
 	Flags   config.Flags
 }
@@ -29,20 +29,33 @@ type Service interface {
 	BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error)
 }
 
-func NewURLRouter(s Service, c config.Flags) *URLRouter {
-	r := URLRouter{chi.NewRouter(), s, c}
+func NewURLHandler(s Service, c config.Flags) http.Handler {
+	r := chi.NewRouter()
+	h := URLHandler{s, c}
 
-	r.Get("/{id}", r.getByID)
-	r.Post("/", r.createFromText)
+	// Public
+	r.Group(func(r chi.Router) {
+		r.Get("/{id}", h.getByID)
+	})
 
-	// JSON-based:
-	r.Post("/api/shorten", r.create)
-	r.Post("/api/shorten/batch", r.batchCreate)
+	// Auto auth
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AutoAuthMiddleware)
 
-	return &r
+		r.Post("/", h.createFromText)
+		r.Post("/api/shorten", h.create)
+		r.Post("/api/shorten/batch", h.batchCreate)
+	})
+
+	// Require auth
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.RequireAuthMiddleware)
+	})
+
+	return r
 }
 
-func (router *URLRouter) createFromText(w http.ResponseWriter, r *http.Request) {
+func (router *URLHandler) createFromText(w http.ResponseWriter, r *http.Request) {
 	linkBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Couldn't read body", http.StatusBadRequest)
@@ -70,7 +83,7 @@ func (router *URLRouter) createFromText(w http.ResponseWriter, r *http.Request) 
 	router.writeCreateFromTextResult(w, linkid)
 }
 
-func (router *URLRouter) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
+func (router *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -79,7 +92,7 @@ func (router *URLRouter) writeCreateFromTextResult(w http.ResponseWriter, linkid
 	io.WriteString(w, shorturl)
 }
 
-func (router *URLRouter) getByID(w http.ResponseWriter, r *http.Request) {
+func (router *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
 	linkid := chi.URLParam(r, "id")
 
 	if len(linkid) == 0 {
@@ -96,7 +109,7 @@ func (router *URLRouter) getByID(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, link, http.StatusTemporaryRedirect)
 }
 
-func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
+func (router *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var reqmodel dto.ShortenRequest
 	if err := decoder.Decode(&reqmodel); err != nil {
@@ -127,7 +140,7 @@ func (router *URLRouter) create(w http.ResponseWriter, r *http.Request) {
 	router.writeCreateResult(w, linkid)
 }
 
-func (router *URLRouter) writeCreateResult(w http.ResponseWriter, linkid string) {
+func (router *URLHandler) writeCreateResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(router.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -141,7 +154,7 @@ func (router *URLRouter) writeCreateResult(w http.ResponseWriter, linkid string)
 	}
 }
 
-func (router *URLRouter) batchCreate(w http.ResponseWriter, r *http.Request) {
+func (router *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var request []dto.BatchRequestURL
 	if err := decoder.Decode(&request); err != nil {
