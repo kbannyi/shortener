@@ -6,10 +6,11 @@ import (
 )
 
 type URL struct {
-	ID       string  `json:"uuid" db:"id"`
-	Short    string  `json:"short_url" db:"short_url"`
-	Original string  `json:"original_url" db:"original_url"`
-	UserID   *string `json:"user_id" db:"user_id"`
+	ID        string  `json:"uuid" db:"id"`
+	Short     string  `json:"short_url" db:"short_url"`
+	Original  string  `json:"original_url" db:"original_url"`
+	UserID    *string `json:"user_id" db:"user_id"`
+	IsDeleted bool    `json:"is_deleted" db:"is_deleted"`
 }
 
 func NewURL(value string) *URL {
