@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"context"
@@ -10,12 +10,21 @@ import (
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/kbannyi/shortener/internal/models"
+	"github.com/kbannyi/shortener/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockService struct{}
 
-func (s *MockService) Create(value string) (ID string, err error) {
+func (s *MockService) DeleteByUser(ctx context.Context, ids []string) error {
+	panic("unimplemented")
+}
+
+func (s *MockService) GetByUser(ctx context.Context) ([]*domain.URL, error) {
+	panic("unimplemented")
+}
+
+func (s *MockService) Create(ctx context.Context, value string) (ID string, err error) {
 	return "mockid", nil
 }
 
@@ -23,8 +32,13 @@ func (s *MockService) BatchCreate(ctx context.Context, urls []models.CorrelatedU
 	return map[string]*domain.URL{"1": {Short: "1"}, "2": {Short: "2"}}, nil
 }
 
-func (s *MockService) Get(ID string) (string, bool) {
-	return "redirect", ID == "mockid"
+func (s *MockService) Get(ID string) (url string, err error) {
+	url = "redirect"
+	if ID != "mockid" {
+		err = repository.ErrNotFound
+	}
+
+	return
 }
 
 func TestURLRouter(t *testing.T) {
@@ -87,7 +101,7 @@ func TestURLRouter(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, tc.request, strings.NewReader(tc.body))
 			w := httptest.NewRecorder()
-			router := NewURLRouter(&MockService{}, config.Flags{
+			router := NewURLHandler(&MockService{}, config.Flags{
 				RedirectBaseAddr: "http://localhost:8080/",
 			})
 
