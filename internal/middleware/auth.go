@@ -26,6 +26,12 @@ func process(h http.Handler, createUser bool) http.Handler {
 		)
 
 		headerValue := r.Header.Get(HEADER_NAME)
+		if headerValue == "" {
+			c, err := r.Cookie(HEADER_NAME)
+			if err == nil {
+				headerValue = c.Value
+			}
+		}
 		var user auth.AuthUser
 		var err error
 		if headerValue == "" {
@@ -38,16 +44,19 @@ func process(h http.Handler, createUser bool) http.Handler {
 			user, err = auth.ReadJWTString(headerValue)
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			logger.Log.Error(err.Error())
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
 		token, err := auth.BuildJWTString(user)
 		if err != nil {
+			logger.Log.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set(HEADER_NAME, token)
+		http.SetCookie(w, &http.Cookie{Name: HEADER_NAME, Value: token})
 
 		ctx := auth.ToContext(r.Context(), user)
 		h.ServeHTTP(w, r.WithContext(ctx))
