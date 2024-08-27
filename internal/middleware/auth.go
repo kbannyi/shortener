@@ -8,7 +8,7 @@ import (
 	"github.com/kbannyi/shortener/internal/logger"
 )
 
-const HEADER_NAME = "Authorization"
+const HeaderName = "Authorization"
 
 func RequireAuthMiddleware(h http.Handler) http.Handler {
 	return process(h, false)
@@ -25,9 +25,9 @@ func process(h http.Handler, createUser bool) http.Handler {
 			"path", r.URL.Path,
 		)
 
-		headerValue := r.Header.Get(HEADER_NAME)
+		headerValue := r.Header.Get(HeaderName)
 		if headerValue == "" {
-			c, err := r.Cookie(HEADER_NAME)
+			c, err := r.Cookie(HeaderName)
 			if err == nil {
 				headerValue = c.Value
 			}
@@ -55,8 +55,8 @@ func process(h http.Handler, createUser bool) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set(HEADER_NAME, token)
-		http.SetCookie(w, &http.Cookie{Name: HEADER_NAME, Value: token})
+		w.Header().Set(HeaderName, token)
+		http.SetCookie(w, &http.Cookie{Name: HeaderName, Value: token})
 
 		ctx := auth.ToContext(r.Context(), user)
 		h.ServeHTTP(w, r.WithContext(ctx))

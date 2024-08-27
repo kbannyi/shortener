@@ -166,7 +166,10 @@ func (r *FileURLRepository) DeleteIDs(ctx context.Context, ids []string) error {
 	for _, url := range results {
 		url.IsDeleted = true
 	}
-	r.BatchSave(ctx, results)
+	err := r.BatchSave(ctx, results)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
