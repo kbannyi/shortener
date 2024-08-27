@@ -54,7 +54,7 @@ func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	defer r.mu.Unlock()
 	_, ok := r.byID[url.ID]
 	if ok {
-		return &DuplicateURLError{URL: url}
+		return &ErrDuplicateURL{URL: url}
 	}
 
 	if err := saveToIndex([]*domain.URL{url}, r.fileStoragePath); err != nil {
@@ -66,26 +66,13 @@ func (r *FileURLRepository) Save(ctx context.Context, url *domain.URL) error {
 }
 
 func (r *FileURLRepository) BatchSave(ctx context.Context, urls []*domain.URL) error {
-	batch := make([]*domain.URL, 0, len(urls))
-	for _, url := range urls {
-		_, ok := r.byID[url.ID]
-		if ok {
-			continue
-		}
-		batch = append(batch, url)
-	}
-
-	if len(batch) == 0 {
-		return nil
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if err := saveToIndex(batch, r.fileStoragePath); err != nil {
+	if err := saveToIndex(urls, r.fileStoragePath); err != nil {
 		return fmt.Errorf("couldn't write to storage file: %w", err)
 	}
 
-	for _, url := range batch {
+	for _, url := range urls {
 		r.byID[url.ID] = url
 	}
 
@@ -116,12 +103,18 @@ func saveToIndex(urls []*domain.URL, path string) error {
 	return writer.Flush()
 }
 
-func (r *FileURLRepository) Get(ctx context.Context, ID string) (URL *domain.URL, ok bool) {
+func (r *FileURLRepository) Get(ctx context.Context, ID string) (*domain.URL, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	URL, ok = r.byID[ID]
+	url, ok := r.byID[ID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if url.IsDeleted {
+		return nil, ErrDeleted
+	}
 
-	return
+	return url, nil
 }
 
 func (r *FileURLRepository) GetByUser(ctx context.Context, userid string) ([]*domain.URL, error) {
@@ -133,4 +126,47 @@ func (r *FileURLRepository) GetByUser(ctx context.Context, userid string) ([]*do
 	}
 
 	return urls, nil
+}
+
+func (r *FileURLRepository) GetList(ctx context.Context, ids []string) ([]*domain.URL, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results := make([]*domain.URL, 0, len(ids))
+	for _, id := range ids {
+		url, ok := r.byID[id]
+		if !ok {
+			return nil, ErrNotFound
+		}
+		if url.IsDeleted {
+			return nil, ErrDeleted
+		}
+		results = append(results, url)
+	}
+
+	return results, nil
+}
+
+func (r *FileURLRepository) DeleteIDs(ctx context.Context, ids []string) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results := make([]*domain.URL, 0, len(ids))
+	for _, id := range ids {
+		url, ok := r.byID[id]
+		if !ok {
+			return ErrNotFound
+		}
+		if url.IsDeleted {
+			return ErrDeleted
+		}
+		results = append(results, url)
+	}
+
+	for _, url := range results {
+		url.IsDeleted = true
+	}
+	r.BatchSave(ctx, results)
+
+	return nil
 }

@@ -17,7 +17,7 @@ type Claims struct {
 	UserID string
 }
 
-const tokenExp = time.Hour * 1
+const tokenExp = time.Hour * 24
 const secretKey = "supersecretkey"
 
 type contextkey string
@@ -25,6 +25,7 @@ type contextkey string
 const contextKey contextkey = "UserContext"
 
 var ErrNotAuthenticated = errors.New("not authenticated")
+var ErrNotAuthorized = errors.New("not authorized")
 
 func FromContext(ctx context.Context) (AuthUser, error) {
 	u, ok := ctx.Value(contextKey).(AuthUser)

@@ -10,10 +10,15 @@ import (
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/kbannyi/shortener/internal/models"
+	"github.com/kbannyi/shortener/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockService struct{}
+
+func (s *MockService) DeleteByUser(ctx context.Context, ids []string) error {
+	panic("unimplemented")
+}
 
 func (s *MockService) GetByUser(ctx context.Context) ([]*domain.URL, error) {
 	panic("unimplemented")
@@ -27,8 +32,13 @@ func (s *MockService) BatchCreate(ctx context.Context, urls []models.CorrelatedU
 	return map[string]*domain.URL{"1": {Short: "1"}, "2": {Short: "2"}}, nil
 }
 
-func (s *MockService) Get(ID string) (string, bool) {
-	return "redirect", ID == "mockid"
+func (s *MockService) Get(ID string) (url string, err error) {
+	url = "redirect"
+	if ID != "mockid" {
+		err = repository.ErrNotFound
+	}
+
+	return
 }
 
 func TestURLRouter(t *testing.T) {
