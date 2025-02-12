@@ -17,14 +17,14 @@ func TestMemoryURLRepository_ReturnsSavedURLs(t *testing.T) {
 	ctx := context.Background()
 	err = r.Save(ctx, URL)
 	assert.NoError(t, err)
-	v1, ok1 := r.Get(ctx, URL.ID)
-	v2, ok2 := r.Get(ctx, "unknownid")
+	v1, err1 := r.Get(ctx, URL.ID)
+	v2, err2 := r.Get(ctx, "unknownid")
 
 	assert.Equal(t, v1.Original, testValue)
 	assert.Equal(t, v1.ID, URL.ID)
-	assert.True(t, ok1)
+	assert.NoError(t, err1)
 	assert.Nil(t, v2)
-	assert.False(t, ok2)
+	assert.Error(t, err2)
 }
 
 func TestMemoryURLRepository_ReturnsBatchSavedURLs(t *testing.T) {
@@ -38,16 +38,16 @@ func TestMemoryURLRepository_ReturnsBatchSavedURLs(t *testing.T) {
 	ctx := context.Background()
 	err = r.BatchSave(ctx, []*domain.URL{URL1, URL2})
 	assert.NoError(t, err)
-	v1, ok1 := r.Get(ctx, URL1.ID)
-	v2, ok2 := r.Get(ctx, URL2.ID)
-	v3, ok3 := r.Get(ctx, "unknownid")
+	v1, err1 := r.Get(ctx, URL1.ID)
+	v2, err2 := r.Get(ctx, URL2.ID)
+	v3, err3 := r.Get(ctx, "unknownid")
 
 	assert.Equal(t, v1.Original, testValue1)
 	assert.Equal(t, v1.ID, URL1.ID)
 	assert.Equal(t, v2.Original, testValue2)
 	assert.Equal(t, v2.ID, URL2.ID)
-	assert.True(t, ok1)
-	assert.True(t, ok2)
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
 	assert.Nil(t, v3)
-	assert.False(t, ok3)
+	assert.Error(t, err3)
 }

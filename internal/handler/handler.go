@@ -9,6 +9,7 @@ import (
 	"net/url"
 
 	"github.com/go-chi/chi"
+	"github.com/kbannyi/shortener/internal/auth"
 	"github.com/kbannyi/shortener/internal/config"
 	"github.com/kbannyi/shortener/internal/domain"
 	"github.com/kbannyi/shortener/internal/dto"
@@ -25,8 +26,9 @@ type URLHandler struct {
 
 type Service interface {
 	Create(ctx context.Context, value string) (ID string, err error)
-	Get(ID string) (string, bool)
+	Get(ID string) (string, error)
 	GetByUser(ctx context.Context) ([]*domain.URL, error)
+	DeleteByUser(ctx context.Context, ids []string) error
 	BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error)
 }
 
@@ -53,6 +55,7 @@ func NewURLHandler(s Service, c config.Flags) http.Handler {
 		r.Use(middleware.RequireAuthMiddleware)
 
 		r.Get("/api/user/urls", h.getByUser)
+		r.Delete("/api/user/urls", h.deleteByUser)
 	})
 
 	return r
@@ -72,13 +75,14 @@ func (handler *URLHandler) createFromText(w http.ResponseWriter, r *http.Request
 
 	linkid, err := handler.Service.Create(r.Context(), link)
 	if err != nil {
-		var dupErr *repository.DuplicateURLError
+		var dupErr *repository.ErrDuplicateURL
 		if errors.As(err, &dupErr) {
 			w.WriteHeader(http.StatusConflict)
 			handler.writeCreateFromTextResult(w, dupErr.URL.ID)
 			return
 		}
 
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -89,11 +93,13 @@ func (handler *URLHandler) createFromText(w http.ResponseWriter, r *http.Request
 func (handler *URLHandler) writeCreateFromTextResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, err = io.WriteString(w, shorturl)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -107,9 +113,18 @@ func (handler *URLHandler) getByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	link, ok := handler.Service.Get(linkid)
-	if !ok {
-		http.Error(w, "Unknown link", http.StatusBadRequest)
+	link, err := handler.Service.Get(linkid)
+	if errors.Is(err, repository.ErrNotFound) {
+		http.Error(w, "link by id not found", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, repository.ErrDeleted) {
+		w.WriteHeader(http.StatusGone)
+		return
+	}
+	if err != nil {
+		logger.Log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -130,7 +145,7 @@ func (handler *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 
 	linkid, err := handler.Service.Create(r.Context(), reqmodel.URL)
 	if err != nil {
-		var dupErr *repository.DuplicateURLError
+		var dupErr *repository.ErrDuplicateURL
 		if errors.As(err, &dupErr) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
@@ -138,6 +153,7 @@ func (handler *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -150,6 +166,7 @@ func (handler *URLHandler) create(w http.ResponseWriter, r *http.Request) {
 func (handler *URLHandler) writeCreateResult(w http.ResponseWriter, linkid string) {
 	shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, linkid)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -187,6 +204,7 @@ func (handler *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 
 	urls, err := handler.Service.BatchCreate(r.Context(), correlated)
 	if err != nil {
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -194,6 +212,7 @@ func (handler *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 	for _, orig := range request {
 		shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, urls[orig.CorrelationID].Short)
 		if err != nil {
+			logger.Log.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -214,6 +233,7 @@ func (handler *URLHandler) batchCreate(w http.ResponseWriter, r *http.Request) {
 func (handler *URLHandler) getByUser(w http.ResponseWriter, r *http.Request) {
 	urls, err := handler.Service.GetByUser(r.Context())
 	if err != nil {
+		logger.Log.Error(err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -227,6 +247,7 @@ func (handler *URLHandler) getByUser(w http.ResponseWriter, r *http.Request) {
 	for _, u := range urls {
 		shorturl, err := url.JoinPath(handler.Flags.RedirectBaseAddr, u.Short)
 		if err != nil {
+			logger.Log.Error(err.Error())
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -241,4 +262,32 @@ func (handler *URLHandler) getByUser(w http.ResponseWriter, r *http.Request) {
 		logger.Log.Errorf("Response write failed: %v", err)
 		return
 	}
+}
+
+func (handler *URLHandler) deleteByUser(w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var request []string
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(request) == 0 {
+		http.Error(w, "request is empty", http.StatusBadRequest)
+		return
+	}
+
+	err := handler.Service.DeleteByUser(r.Context(), request)
+	if errors.Is(err, repository.ErrNotFound) {
+		http.Error(w, "link by id not found", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, auth.ErrNotAuthorized) {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		logger.Log.Error(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	w.WriteHeader(http.StatusAccepted)
 }

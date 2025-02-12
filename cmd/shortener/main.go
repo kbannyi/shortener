@@ -72,7 +72,9 @@ func main() {
 		logger.Log.Errorf("Coudn't initialize repository: %v", err)
 		return
 	}
-	serv := service.NewService(repo)
+	ctx, ctxclose := context.WithCancel(context.Background())
+	defer ctxclose()
+	serv := service.NewService(ctx, repo)
 	r := chi.NewRouter()
 	r.Use(middleware.RequestLoggerMiddleware)
 	r.Use(middleware.ResponseLoggerMiddleware)

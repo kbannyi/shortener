@@ -23,7 +23,7 @@ func (r *MemoryURLRepository) Save(ctx context.Context, url *domain.URL) error {
 	defer r.mu.Unlock()
 	_, ok := r.byID[url.ID]
 	if ok {
-		return &DuplicateURLError{URL: url}
+		return &ErrDuplicateURL{URL: url}
 	}
 	r.byID[url.ID] = url
 
@@ -46,12 +46,18 @@ func (r *MemoryURLRepository) BatchSave(ctx context.Context, urls []*domain.URL)
 	return nil
 }
 
-func (r *MemoryURLRepository) Get(ctx context.Context, ID string) (URL *domain.URL, ok bool) {
+func (r *MemoryURLRepository) Get(ctx context.Context, ID string) (*domain.URL, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	URL, ok = r.byID[ID]
+	url, ok := r.byID[ID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	if url.IsDeleted {
+		return nil, ErrDeleted
+	}
 
-	return
+	return url, nil
 }
 
 func (r *MemoryURLRepository) GetByUser(ctx context.Context, userid string) ([]*domain.URL, error) {
@@ -63,4 +69,46 @@ func (r *MemoryURLRepository) GetByUser(ctx context.Context, userid string) ([]*
 	}
 
 	return urls, nil
+}
+
+func (r *MemoryURLRepository) GetList(ctx context.Context, ids []string) ([]*domain.URL, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results := make([]*domain.URL, 0, len(ids))
+	for _, id := range ids {
+		url, ok := r.byID[id]
+		if !ok {
+			return nil, ErrNotFound
+		}
+		if url.IsDeleted {
+			return nil, ErrDeleted
+		}
+		results = append(results, url)
+	}
+
+	return results, nil
+}
+
+func (r *MemoryURLRepository) DeleteIDs(ctx context.Context, ids []string) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	results := make([]*domain.URL, 0, len(ids))
+	for _, id := range ids {
+		url, ok := r.byID[id]
+		if !ok {
+			return ErrNotFound
+		}
+		if url.IsDeleted {
+			return ErrDeleted
+		}
+		results = append(results, url)
+	}
+
+	for _, url := range results {
+		url.IsDeleted = true
+	}
+
+	return nil
 }
