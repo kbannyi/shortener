@@ -53,3 +53,14 @@ func (r *MemoryURLRepository) Get(ctx context.Context, ID string) (URL *domain.U
 
 	return
 }
+
+func (r *MemoryURLRepository) GetByUser(ctx context.Context, userid string) ([]*domain.URL, error) {
+	urls := []*domain.URL{}
+	for _, url := range r.byID {
+		if url.UserID != nil && *url.UserID == userid {
+			urls = append(urls, url)
+		}
+	}
+
+	return urls, nil
+}

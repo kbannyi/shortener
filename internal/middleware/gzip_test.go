@@ -3,44 +3,25 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/kbannyi/shortener/internal/config"
-	"github.com/kbannyi/shortener/internal/domain"
-	"github.com/kbannyi/shortener/internal/models"
-	"github.com/kbannyi/shortener/internal/router"
 	"github.com/stretchr/testify/require"
 )
 
-type MockService struct{}
-
-func (s *MockService) Create(value string) (ID string, err error) {
-	return "mockid", nil
-}
-
-func (s *MockService) Get(ID string) (string, bool) {
-	return "redirect", ID == "mockid"
-}
-
-func (s *MockService) BatchCreate(ctx context.Context, correlated []models.CorrelatedURL) (map[string]*domain.URL, error) {
-	return nil, errors.New("not impl")
-}
-
 func TestGzipCompression(t *testing.T) {
-	handler := GZIPMiddleware(router.NewURLRouter(&MockService{}, config.Flags{
-		RedirectBaseAddr: "http://localhost:8080/",
-	}))
-
-	srv := httptest.NewServer(handler)
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqbytes, _ := io.ReadAll(r.Body)
+		_, _ = io.WriteString(w, strings.ToUpper(string(reqbytes)))
+	})
+	srv := httptest.NewServer(GZIPMiddleware(h))
 	defer srv.Close()
 
-	requestBody := `{"url": "https://go.dev/doc/effective_go#allocation_new"}`
-	successBody := `{"result":"http://localhost:8080/mockid"}`
+	requestBody := `Hello, World!`
+	successBody := `HELLO, WORLD!`
 
 	t.Run("sends_gzip", func(t *testing.T) {
 		buf := bytes.NewBuffer(nil)
@@ -57,13 +38,13 @@ func TestGzipCompression(t *testing.T) {
 
 		resp, err := http.DefaultClient.Do(r)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		defer resp.Body.Close()
 
 		b, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
-		require.JSONEq(t, successBody, string(b))
+		require.Equal(t, successBody, string(b))
 	})
 
 	t.Run("accepts_gzip", func(t *testing.T) {
@@ -74,7 +55,7 @@ func TestGzipCompression(t *testing.T) {
 
 		resp, err := http.DefaultClient.Do(r)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusCreated, resp.StatusCode)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
 
 		defer resp.Body.Close()
 
@@ -84,6 +65,6 @@ func TestGzipCompression(t *testing.T) {
 		b, err := io.ReadAll(zr)
 		require.NoError(t, err)
 
-		require.JSONEq(t, successBody, string(b))
+		require.Equal(t, successBody, string(b))
 	})
 }

@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"context"
@@ -15,7 +15,11 @@ import (
 
 type MockService struct{}
 
-func (s *MockService) Create(value string) (ID string, err error) {
+func (s *MockService) GetByUser(ctx context.Context) ([]*domain.URL, error) {
+	panic("unimplemented")
+}
+
+func (s *MockService) Create(ctx context.Context, value string) (ID string, err error) {
 	return "mockid", nil
 }
 
@@ -87,7 +91,7 @@ func TestURLRouter(t *testing.T) {
 		t.Run(tc.method, func(t *testing.T) {
 			r := httptest.NewRequest(tc.method, tc.request, strings.NewReader(tc.body))
 			w := httptest.NewRecorder()
-			router := NewURLRouter(&MockService{}, config.Flags{
+			router := NewURLHandler(&MockService{}, config.Flags{
 				RedirectBaseAddr: "http://localhost:8080/",
 			})
 

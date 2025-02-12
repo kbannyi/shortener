@@ -123,3 +123,14 @@ func (r *FileURLRepository) Get(ctx context.Context, ID string) (URL *domain.URL
 
 	return
 }
+
+func (r *FileURLRepository) GetByUser(ctx context.Context, userid string) ([]*domain.URL, error) {
+	urls := []*domain.URL{}
+	for _, url := range r.byID {
+		if url.UserID != nil && *url.UserID == userid {
+			urls = append(urls, url)
+		}
+	}
+
+	return urls, nil
+}
